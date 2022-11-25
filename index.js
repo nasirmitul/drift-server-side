@@ -43,6 +43,15 @@ async function run() {
 
         const categoryCollection = client.db('drift').collection('categories');
         const productsCollection = client.db('drift').collection('products');
+        const userCollection = client.db('drift').collection('users');
+
+        //getting user data
+        app.post('/users', async(req, res) => {
+            const user = req.body;
+            const result = await userCollection.insertOne(user);
+            res.send(result);
+        })
+
 
         //creating api for categories
         app.get('/categories', async (req, res) => {
