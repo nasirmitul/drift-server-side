@@ -45,6 +45,18 @@ async function run() {
         const productsCollection = client.db('drift').collection('products');
         const userCollection = client.db('drift').collection('users');
 
+        //creating api for jwt
+        app.get('/jwt', async (req, res) => {
+            const email = req.query.email;
+            const query = { email: email }
+            const user = await userCollection.findOne(query);
+            if (user) {
+                const token = jwt.sign({ email }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' })
+                return res.send({ accessToken: token })
+            }
+            res.status(403).send({ accessToken: '' })
+        })
+
         //getting user data
         app.post('/users', async (req, res) => {
             const user = req.body;
@@ -91,9 +103,6 @@ async function run() {
             const result = await userCollection.updateOne(filter, updatedDoc, option);
             res.send(result);
         })
-
-
-        
 
     }
     finally {
