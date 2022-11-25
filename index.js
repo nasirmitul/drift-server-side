@@ -52,6 +52,14 @@ async function run() {
             res.send(result);
         })
 
+        //creating api all user and seller for admin role
+        app.get('/allSeller/:user_role', async (req, res) => {
+            const role = req.params.user_role;
+            const query = { user_role: role };
+            const cursor = userCollection.find(query);
+            const sellers = await cursor.toArray();
+            res.send(sellers);
+        })
 
         //creating api for categories
         app.get('/categories', async (req, res) => {
