@@ -44,6 +44,7 @@ async function run() {
         const categoryCollection = client.db('drift').collection('categories');
         const productsCollection = client.db('drift').collection('products');
         const userCollection = client.db('drift').collection('users');
+        const myOrderCollection = client.db('drift').collection('myOrders');
 
         //creating api for jwt
         app.get('/jwt', async (req, res) => {
@@ -56,6 +57,15 @@ async function run() {
             }
             res.status(403).send({ accessToken: '' })
         })
+
+
+        //getting user data
+        app.post('/myOrders', async (req, res) => {
+            const order = req.body;
+            const result = await myOrderCollection.insertOne(order);
+            res.send(result);
+        })
+
 
         //getting user data
         app.post('/users', async (req, res) => {
