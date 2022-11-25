@@ -46,14 +46,14 @@ async function run() {
         const userCollection = client.db('drift').collection('users');
 
         //getting user data
-        app.post('/users', async(req, res) => {
+        app.post('/users', async (req, res) => {
             const user = req.body;
             const result = await userCollection.insertOne(user);
             res.send(result);
         })
 
         //creating api all user and seller for admin role
-        app.get('/allSeller/:user_role', async (req, res) => {
+        app.get('/allUser/:user_role', async (req, res) => {
             const role = req.params.user_role;
             const query = { user_role: role };
             const cursor = userCollection.find(query);
@@ -68,7 +68,7 @@ async function run() {
             const categories = await cursor.toArray();
             res.send(categories);
         })
-        
+
         //creating api for single service
         app.get('/category/:id', async (req, res) => {
             const id = req.params.id;
@@ -76,6 +76,20 @@ async function run() {
             const cursor = productsCollection.find(query);
             const products = await cursor.toArray();
             res.send(products);
+        })
+
+        //verify user
+        app.put('/allUser/seller/:id', async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: ObjectId(id) }
+            const option = { upsert: true };
+            const updatedDoc = {
+                $set: {
+                    verify: 'verified'
+                }
+            }
+            const result = await userCollection.updateOne(filter, updatedDoc, option);
+            res.send(result);
         })
 
 
