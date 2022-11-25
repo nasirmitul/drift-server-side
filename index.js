@@ -66,6 +66,15 @@ async function run() {
             res.send(result);
         })
 
+        //creating api for my orders based on email
+        app.get('/myOrders/:email', async (req, res) => {
+            const email = req.params.email;
+            console.log(email);
+            const query = { user_email: email };
+            const cursor = myOrderCollection.find(query);
+            const sellers = await cursor.toArray();
+            res.send(sellers);
+        })
 
         //getting user data
         app.post('/users', async (req, res) => {
