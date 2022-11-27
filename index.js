@@ -73,6 +73,15 @@ async function run() {
             res.send(result);
         })
 
+        //creating api for my Product page
+        app.get('/myProduct/:email', async (req, res) => {
+            const email = req.params.email;
+            const query = { seller_email: email };
+            const cursor = productsCollection.find(query);
+            const products = await cursor.toArray();
+            res.send(products);
+        })
+
         //creating api for my orders based on email
         app.get('/myOrders/:email', verifyJWT, async (req, res) => {
             const email = req.params.email;
