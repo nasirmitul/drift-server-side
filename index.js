@@ -29,7 +29,7 @@ function verifyJWT(req, res, next) {
 
     jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, function (err, decoded) {
         if (err) {
-            return res.status(401).send({ message: 'unauthorized access' })
+            return res.status(403).send({ message: 'forbidden access' })
         }
         req.decoded = decoded;
         next()
@@ -52,7 +52,7 @@ async function run() {
             const query = { email: email }
             const user = await userCollection.findOne(query);
             if (user) {
-                const token = jwt.sign({ email }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' })
+                const token = jwt.sign({ email }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '7d' })
                 return res.send({ accessToken: token })
             }
             res.status(403).send({ accessToken: '' })
@@ -67,9 +67,14 @@ async function run() {
         })
 
         //creating api for my orders based on email
-        app.get('/myOrders/:email', async (req, res) => {
+        app.get('/myOrders/:email', verifyJWT, async (req, res) => {
             const email = req.params.email;
-            console.log(email);
+
+            const decodedEmail = req.decoded.email;
+            if (email != decodedEmail) {
+                return res.status(403).send({ message: 'forbidden access' });
+            }
+
             const query = { user_email: email };
             const cursor = myOrderCollection.find(query);
             const sellers = await cursor.toArray();
@@ -82,6 +87,32 @@ async function run() {
             const result = await userCollection.insertOne(user);
             res.send(result);
         })
+
+        
+        //checking admin
+        app.get('/users/admin/:email', async (req, res) => {
+            const email = req.params.email;
+            const query = { email: email }
+            const admin = await userCollection.findOne(query);
+            res.send({ isAdmin: admin?.user_role === 'admin' });
+        })
+
+        //checking buyer
+        app.get('/users/buyer/:email', async (req, res) => {
+            const email = req.params.email;
+            const query = { email: email }
+            const buyer = await userCollection.findOne(query);
+            res.send({ isBuyer: buyer?.user_role === 'user' });
+        })
+
+        //checking seller
+        app.get('/users/seller/:email', async (req, res) => {
+            const email = req.params.email;
+            const query = { email: email }
+            const seller = await userCollection.findOne(query);
+            res.send({ isSeller: seller?.user_role === 'seller' });
+        })
+
 
         //creating api all user and seller for admin role
         app.get('/allUser/:user_role', async (req, res) => {
@@ -110,7 +141,16 @@ async function run() {
         })
 
         //verify user
-        app.put('/allUser/seller/:id', async (req, res) => {
+        app.put('/allUser/seller/:id', verifyJWT, async (req, res) => {
+            const decodedEmail = req.decoded.email;
+            const query = { email: decodedEmail }
+
+            const user = await userCollection.findOne(query)
+            if (user.user_role !== 'admin') {
+                return res.status(403).send({ message: 'forbidden access' })
+            }
+
+
             const id = req.params.id;
             const filter = { _id: ObjectId(id) }
             const option = { upsert: true };
