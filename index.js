@@ -59,10 +59,17 @@ async function run() {
         })
 
 
-        //getting user data
+        //getting user data for my order
         app.post('/myOrders', async (req, res) => {
             const order = req.body;
             const result = await myOrderCollection.insertOne(order);
+            res.send(result);
+        })
+
+        //getting add product Data
+        app.post('/addProduct', async (req, res) => {
+            const product = req.body;
+            const result = await productsCollection.insertOne(product);
             res.send(result);
         })
 
@@ -130,6 +137,16 @@ async function run() {
             const categories = await cursor.toArray();
             res.send(categories);
         })
+
+        //creating api for single category
+        app.get('/singleCategory/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) };
+            const cursor = categoryCollection.find(query);
+            const products = await cursor.toArray();
+            res.send(products);
+        })
+
 
         //creating api for single service
         app.get('/category/:id', async (req, res) => {
