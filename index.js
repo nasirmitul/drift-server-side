@@ -5,7 +5,7 @@ const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const app = express()
 const port = process.env.PORT || 5000;
 require('dotenv').config()
-
+const stripe = require("stripe")(process.env.STRIPE_SECRET)
 
 //middleware
 app.use(cors())
@@ -45,6 +45,7 @@ async function run() {
         const productsCollection = client.db('drift').collection('products');
         const userCollection = client.db('drift').collection('users');
         const myOrderCollection = client.db('drift').collection('myOrders');
+        const paymentCollection = client.db('drift').collection('payments');
 
         //creating api for jwt
         app.get('/jwt', async (req, res) => {
@@ -58,6 +59,24 @@ async function run() {
             res.status(403).send({ accessToken: '' })
         })
 
+
+        //payment
+        app.post('/create-payment-intent', async(req, res) => {
+            const payment = req.body;
+            const price = payment.price;
+            const amount = price*100;
+
+            const paymentIntent = await stripe.paymentIntents.create({
+                currency: 'usd',
+                amount: amount,
+                "payment_method_types": [
+                    "card"
+                ]
+            });
+            res.send({
+                clientSecret: paymentIntent.client_secret
+            });
+        })
 
         //getting user data for my order
         app.post('/myOrders', async (req, res) => {
@@ -97,6 +116,14 @@ async function run() {
             res.send(sellers);
         })
 
+        //creating api from my order using order id
+        app.get('/myOrder/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) };
+            const order = await myOrderCollection.findOne(query);
+            res.send(order);
+        })
+
         //getting user data
         app.post('/users', async (req, res) => {
             const user = req.body;
@@ -104,7 +131,20 @@ async function run() {
             res.send(result);
         })
 
-        
+
+        //delete user 
+        app.delete('/users/:email', async (req, res) => {
+            const email = req.params.email;
+            const userQuery = { email: email };
+            const productQuery = { seller_name: email };
+            const orderQuery = { seller_name: email };
+            const advertiseQuery = { seller_name: email }
+
+            const result = await userCollection.deleteOne(userQuery);
+            res.send(result)
+        })
+
+
         //checking admin
         app.get('/users/admin/:email', async (req, res) => {
             const email = req.params.email;
@@ -128,7 +168,6 @@ async function run() {
             const seller = await userCollection.findOne(query);
             res.send({ isSeller: seller?.user_role === 'seller' });
         })
-
 
         //creating api all user and seller for admin role
         app.get('/allUser/:user_role', async (req, res) => {
@@ -165,6 +204,50 @@ async function run() {
             const products = await cursor.toArray();
             res.send(products);
         })
+
+
+        //store payment data and update myOrder and products payment info
+
+        app.post('/payment', async(req, res) => {
+            const payment = req.body;
+            const result = await paymentCollection.insertOne(payment);
+
+            const orderId = payment.orderId
+
+            const orderFilter = {_id: ObjectId(orderId)}
+   
+            const updatedDoc = {
+                $set: {
+                    paid: true,
+                    transactionId: payment.transactionId
+                }
+            }
+
+
+
+            const orderResult = await myOrderCollection.updateOne(orderFilter, updatedDoc)
+            
+
+            res.send(result);
+        })
+
+        app.put('/products/:id', async(req, res) => {
+
+            const id = req.params.id;
+
+            const productQuery = {_id : ObjectId(id)}
+
+            const option = { upsert: true };
+            const updatedDoc = {
+                $set: {
+                    paid: true
+                }
+            }
+
+            const productResult = await productsCollection.updateOne(productQuery, updatedDoc, option);
+            res.send(productResult);
+        })
+
 
         //verify user
         app.put('/allUser/seller/:id', verifyJWT, async (req, res) => {
