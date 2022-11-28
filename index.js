@@ -46,6 +46,7 @@ async function run() {
         const userCollection = client.db('drift').collection('users');
         const myOrderCollection = client.db('drift').collection('myOrders');
         const paymentCollection = client.db('drift').collection('payments');
+        const wishlistCollection = client.db('drift').collection('wishlist');
 
         //creating api for jwt
         app.get('/jwt', async (req, res) => {
@@ -61,10 +62,10 @@ async function run() {
 
 
         //payment
-        app.post('/create-payment-intent', async(req, res) => {
+        app.post('/create-payment-intent', async (req, res) => {
             const payment = req.body;
             const price = payment.price;
-            const amount = price*100;
+            const amount = price * 100;
 
             const paymentIntent = await stripe.paymentIntents.create({
                 currency: 'usd',
@@ -85,6 +86,14 @@ async function run() {
             res.send(result);
         })
 
+        //getting wishlist data
+        app.post('/wishlist', async (req, res) => {
+            const wishlist = req.body;
+            const result = await wishlistCollection.insertOne(wishlist);
+            res.send(result);
+        })
+
+
         //getting add product Data
         app.post('/addProduct', async (req, res) => {
             const product = req.body;
@@ -104,12 +113,10 @@ async function run() {
         //creating api for my orders based on email
         app.get('/myOrders/:email', verifyJWT, async (req, res) => {
             const email = req.params.email;
-
             const decodedEmail = req.decoded.email;
             if (email != decodedEmail) {
                 return res.status(403).send({ message: 'forbidden access' });
             }
-
             const query = { user_email: email };
             const cursor = myOrderCollection.find(query);
             const sellers = await cursor.toArray();
@@ -136,11 +143,16 @@ async function run() {
         app.delete('/users/:email', async (req, res) => {
             const email = req.params.email;
             const userQuery = { email: email };
-            const productQuery = { seller_name: email };
-            const orderQuery = { seller_name: email };
-            const advertiseQuery = { seller_name: email }
 
             const result = await userCollection.deleteOne(userQuery);
+            res.send(result)
+        })
+
+        //delete Product 
+        app.delete('/myProducts/:id', async (req, res) => {
+            const id = req.params.id;
+            const userQuery = { _id: ObjectId(id) };
+            const result = await productsCollection.deleteOne(userQuery);
             res.send(result)
         })
 
@@ -207,59 +219,67 @@ async function run() {
 
 
         //store payment data and update myOrder and products payment info
-
-        app.post('/payment', async(req, res) => {
+        app.post('/payment', async (req, res) => {
             const payment = req.body;
             const result = await paymentCollection.insertOne(payment);
-
             const orderId = payment.orderId
-
-            const orderFilter = {_id: ObjectId(orderId)}
-   
+            const orderFilter = { _id: ObjectId(orderId) }
             const updatedDoc = {
                 $set: {
                     paid: true,
                     transactionId: payment.transactionId
                 }
             }
-
-
-
             const orderResult = await myOrderCollection.updateOne(orderFilter, updatedDoc)
-            
-
             res.send(result);
         })
 
-        app.put('/products/:id', async(req, res) => {
-
+        app.put('/products/:id', async (req, res) => {
             const id = req.params.id;
-
-            const productQuery = {_id : ObjectId(id)}
-
+            const productQuery = { _id: ObjectId(id) }
             const option = { upsert: true };
             const updatedDoc = {
                 $set: {
                     paid: true
                 }
             }
-
             const productResult = await productsCollection.updateOne(productQuery, updatedDoc, option);
             res.send(productResult);
         })
 
 
+        //advertise data
+        app.put('/advertise/:id', async (req, res) => {
+            const id = req.params.id;
+            console.log('id', id);
+            const productQuery = { _id: ObjectId(id) }
+            const option = { upsert: true };
+            const updatedDoc = {
+                $set: {
+                    advertise: true
+                }
+            }
+            const productResult = await productsCollection.updateOne(productQuery, updatedDoc, option);
+            res.send(productResult);
+        })
+
+
+        //creating api for advertisement
+        app.get('/advertise', async (req, res) => {
+            const query = { advertise: true }
+            const cursor = productsCollection.find(query);
+            const advertise = await cursor.toArray();
+            res.send(advertise);
+        })
+
         //verify user
         app.put('/allUser/seller/:id', verifyJWT, async (req, res) => {
             const decodedEmail = req.decoded.email;
             const query = { email: decodedEmail }
-
             const user = await userCollection.findOne(query)
             if (user.user_role !== 'admin') {
                 return res.status(403).send({ message: 'forbidden access' })
             }
-
-
             const id = req.params.id;
             const filter = { _id: ObjectId(id) }
             const option = { upsert: true };
