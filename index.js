@@ -18,23 +18,23 @@ const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology:
 
 
 
-function verifyJWT(req, res, next) {
-    const authHeader = req.headers.authorization;
-    console.log(authHeader);
-    if (!authHeader) {
-        return res.status(401).send({ message: 'unauthorized access' })
-    }
+// function verifyJWT(req, res, next) {
+//     const authHeader = req.headers.authorization;
+//     console.log(authHeader);
+//     if (!authHeader) {
+//         return res.status(401).send({ message: 'unauthorized access' })
+//     }
 
-    const token = authHeader;
+//     const token = authHeader;
 
-    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, function (err, decoded) {
-        if (err) {
-            return res.status(403).send({ message: 'forbidden access' })
-        }
-        req.decoded = decoded;
-        next()
-    })
-}
+//     jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, function (err, decoded) {
+//         if (err) {
+//             return res.status(403).send({ message: 'forbidden access' })
+//         }
+//         req.decoded = decoded;
+//         next()
+//     })
+// }
 
 
 
@@ -49,16 +49,16 @@ async function run() {
         const wishlistCollection = client.db('drift').collection('wishlist');
 
         //creating api for jwt
-        app.get('/jwt', async (req, res) => {
-            const email = req.query.email;
-            const query = { email: email }
-            const user = await userCollection.findOne(query);
-            if (user) {
-                const token = jwt.sign({ email }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '7d' })
-                return res.send({ accessToken: token })
-            }
-            res.status(403).send({ accessToken: '' })
-        })
+        // app.get('/jwt', async (req, res) => {
+        //     const email = req.query.email;
+        //     const query = { email: email }
+        //     const user = await userCollection.findOne(query);
+        //     if (user) {
+        //         const token = jwt.sign({ email }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '7d' })
+        //         return res.send({ accessToken: token })
+        //     }
+        //     res.status(403).send({ accessToken: '' })
+        // })
 
 
         //payment
@@ -93,6 +93,14 @@ async function run() {
             res.send(result);
         })
 
+        //wishlist api
+        app.get('/wishlist/:email', async (req, res) => {
+            const email = req.params.email;
+            const query = { email: email };
+            const cursor = wishlistCollection.find(query);
+            const wish = await cursor.toArray();
+            res.send(wish);
+        })
 
         //getting add product Data
         app.post('/addProduct', async (req, res) => {
@@ -111,12 +119,12 @@ async function run() {
         })
 
         //creating api for my orders based on email
-        app.get('/myOrders/:email', verifyJWT, async (req, res) => {
+        app.get('/myOrders/:email', async (req, res) => {
             const email = req.params.email;
-            const decodedEmail = req.decoded.email;
-            if (email != decodedEmail) {
-                return res.status(403).send({ message: 'forbidden access' });
-            }
+            // const decodedEmail = req.decoded.email;
+            // if (email != decodedEmail) {
+            //     return res.status(403).send({ message: 'forbidden access' });
+            // }
             const query = { user_email: email };
             const cursor = myOrderCollection.find(query);
             const sellers = await cursor.toArray();
@@ -244,6 +252,7 @@ async function run() {
                 }
             }
             const productResult = await productsCollection.updateOne(productQuery, updatedDoc, option);
+            // const wishResult = await wishlistCollection.updateOne(productQuery, updatedDoc, option);
             res.send(productResult);
         })
 
@@ -273,25 +282,28 @@ async function run() {
         })
 
         //verify user
-        app.put('/allUser/seller/:id', verifyJWT, async (req, res) => {
-            const decodedEmail = req.decoded.email;
-            const query = { email: decodedEmail }
-            const user = await userCollection.findOne(query)
-            if (user.user_role !== 'admin') {
-                return res.status(403).send({ message: 'forbidden access' })
-            }
-            const id = req.params.id;
-            const filter = { _id: ObjectId(id) }
+        app.patch('/allUser/seller/:email', async (req, res) => {
+            // const decodedEmail = req.decoded.email;
+            // const query = { email: decodedEmail }
+            // const user = await userCollection.findOne(query)
+            // if (user.user_role !== 'admin') {
+            //     return res.status(403).send({ message: 'forbidden access' })
+            // }
+            const email = req.params.email;
+            const filter = { email: email }
+            const sellerFilter = { seller_email: email }
             const option = { upsert: true };
+
             const updatedDoc = {
                 $set: {
                     verify: 'verified'
                 }
             }
             const result = await userCollection.updateOne(filter, updatedDoc, option);
+            const product = await productsCollection.updateMany(sellerFilter, updatedDoc, option);
+
             res.send(result);
         })
-
     }
     finally {
 
@@ -299,7 +311,6 @@ async function run() {
 }
 
 run().catch(err => console.log(err))
-
 
 
 app.get('/', (req, res) => {
